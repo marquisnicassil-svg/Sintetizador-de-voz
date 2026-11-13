@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AudioWaveform,
   Bookmark,
@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { AiAssistantView } from './components/AiAssistantView';
 import { AndroidApkView } from './components/AndroidApkView';
+import { AppIconMark } from './components/AppIconMark';
+import { AppSplashScreen } from './components/AppSplashScreen';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PhrasesHistoryView } from './components/PhrasesHistoryView';
 import { StudioView } from './components/StudioView';
@@ -37,6 +39,7 @@ const NAV_ITEMS: { id: AppTab; label: string; icon: typeof AudioWaveform }[] = [
 ];
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<AppTab>('studio');
   const [text, setText] = useState<string>(() => storage.getDraftText());
   const [settings, setSettings] = useState<VoiceSettings>(() => storage.getSettings());
@@ -48,6 +51,11 @@ export default function App() {
   const [androidConfig, setAndroidConfig] = useState<AndroidAppConfig>(() =>
     storage.getAndroidConfig()
   );
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -138,6 +146,7 @@ export default function App() {
   const switchTab = (tab: AppTab) => {
     triggerHaptic(8, androidConfig.hapticsEnabled);
     setActiveTab(tab);
+    mainRef.current?.scrollTo({ top: 0 });
   };
 
   const handleAddRule = (from: string, to: string) => {
@@ -261,15 +270,20 @@ export default function App() {
           : 'pt-safe';
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-[#0e1116] text-stone-900 dark:text-stone-100 flex flex-col">
-      {/* Compact Sticky Header with Android WebView status bar clearance */}
+    <div className="h-[100dvh] overflow-hidden overscroll-none bg-stone-50 dark:bg-[#0e1116] text-stone-900 dark:text-stone-100 flex flex-col">
+      {showSplash && <AppSplashScreen onComplete={handleSplashComplete} />}
+
+      {/* Compact Fixed App Header with Android status bar clearance */}
       <header
-        className={`sticky top-0 z-30 ${statusBarTopClass} bg-stone-50/90 dark:bg-[#0e1116]/90 backdrop-blur-md border-b border-stone-200 dark:border-slate-800/90`}
+        className={`shrink-0 z-30 ${statusBarTopClass} bg-stone-50/95 dark:bg-[#0e1116]/95 backdrop-blur-md border-b border-stone-200 dark:border-slate-800/90`}
       >
         <div className="max-w-6xl mx-auto h-12 lg:h-14 px-4 flex items-center justify-between gap-8">
-          <span className="text-base lg:text-lg font-bold tracking-tight text-stone-900 dark:text-white whitespace-nowrap shrink-0">
-            VozSynth
-          </span>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <AppIconMark size={28} />
+            <span className="text-base lg:text-lg font-bold tracking-tight text-stone-900 dark:text-white whitespace-nowrap">
+              VozSynth
+            </span>
+          </div>
 
           <nav
             aria-label="Navegação principal"
@@ -304,9 +318,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* Responsive Workspace */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 pt-4 pb-24 lg:pb-10">
-        <div className="lg:grid lg:grid-cols-12 lg:gap-6 items-start">
+      {/* Native Isolated Scroll Workspace (blocks Android pull-to-refresh) */}
+      <main
+        ref={mainRef}
+        className="flex-1 min-h-0 overflow-y-auto native-scroll-region w-full"
+      >
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-24 lg:pb-10">
+          <div className="lg:grid lg:grid-cols-12 lg:gap-6 items-start">
           {/* Primary Active Mobile/Desktop View */}
           <div className="lg:col-span-7">
             {activeTab === 'studio' && (
@@ -439,6 +457,7 @@ export default function App() {
               />
             )}
           </aside>
+          </div>
         </div>
       </main>
 

@@ -2,6 +2,7 @@ package com.vozsynth.android
 
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
@@ -24,6 +25,8 @@ class MainActivity : BridgeActivity(), TextToSpeech.OnInitListener {
         nativeTts = TextToSpeech(this, this)
 
         val webView = bridge?.webView ?: return
+        webView.overScrollMode = View.OVER_SCROLL_NEVER
+        webView.isVerticalScrollBarEnabled = false
         val settings: WebSettings = webView.settings
         settings.mediaPlaybackRequiresUserGesture = false
         settings.domStorageEnabled = true
