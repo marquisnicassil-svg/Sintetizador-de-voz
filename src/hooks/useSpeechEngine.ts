@@ -75,12 +75,17 @@ export function useSpeechEngine({
     };
 
     loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    const synth = window.speechSynthesis;
+    if (typeof synth.addEventListener === 'function') {
+      synth.addEventListener('voiceschanged', loadVoices);
+    }
     const t1 = window.setTimeout(loadVoices, 300);
     const t2 = window.setTimeout(loadVoices, 1000);
 
     return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      if (typeof synth.removeEventListener === 'function') {
+        synth.removeEventListener('voiceschanged', loadVoices);
+      }
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
