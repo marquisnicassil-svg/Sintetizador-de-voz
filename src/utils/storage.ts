@@ -37,11 +37,35 @@ function detectInitialStatusBarOffset(): number {
   if (typeof window === 'undefined') return 0;
   const ua = navigator.userAgent || '';
   const isAndroid = /android/i.test(ua);
-  const isWebView = /;\s*wv\)/i.test(ua) || window.location.protocol === 'file:' || window.location.protocol === 'capacitor:';
-  const isFullscreen =
+  if (!isAndroid) return 0;
+
+  const isWebView =
+    /;\s*wv\)/i.test(ua) ||
+    window.location.protocol === 'file:' ||
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'ionic:';
+  const isStandaloneOrFullscreen =
     window.matchMedia?.('(display-mode: fullscreen)').matches ||
-    (window.screen && Math.abs(window.screen.height - window.innerHeight) <= 24);
-  return isAndroid && (isFullscreen || isWebView) ? 32 : 0;
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    (window.screen && Math.abs(window.screen.height - window.innerHeight) <= 56);
+
+  // Measure whether Chromium/WebView already populates CSS env(safe-area-inset-top)
+  let cssSafeTop = 0;
+  try {
+    const probe = document.createElement('div');
+    probe.style.position = 'fixed';
+    probe.style.top = '0';
+    probe.style.paddingTop = 'env(safe-area-inset-top, 0px)';
+    probe.style.visibility = 'hidden';
+    document.documentElement.appendChild(probe);
+    cssSafeTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+    document.documentElement.removeChild(probe);
+  } catch {
+    cssSafeTop = 0;
+  }
+
+  if (cssSafeTop >= 18) return 0; // WebView already respects env(safe-area-inset-top)
+  return isWebView || isStandaloneOrFullscreen ? 32 : 0;
 }
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
@@ -166,10 +190,17 @@ export const storage = {
   getHistory: (): HistoryEntry[] => safeRead(KEYS.HISTORY, []),
   saveHistory: (h: HistoryEntry[]) => safeWrite(KEYS.HISTORY, h.slice(0, 40)),
 
-  getAndroidConfig: (): AndroidAppConfig => ({
-    ...DEFAULT_ANDROID_CONFIG,
-    ...safeRead<Partial<AndroidAppConfig>>(KEYS.ANDROID, {}),
-  }),
+  getAndroidConfig: (): AndroidAppConfig => {
+    const saved = safeRead<Partial<AndroidAppConfig>>(KEYS.ANDROID, {});
+    const merged: AndroidAppConfig = {
+      ...DEFAULT_ANDROID_CONFIG,
+      ...saved,
+    };
+    if (!saved.statusBarCustom) {
+      merged.statusBarOffsetPx = detectInitialStatusBarOffset();
+    }
+    return merged;
+  },
   saveAndroidConfig: (c: AndroidAppConfig) => safeWrite(KEYS.ANDROID, c),
 
   getDraftText: (): string => {

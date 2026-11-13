@@ -286,16 +286,19 @@ export function useSpeechEngine({
       }
 
       const durationMs = Math.max(200, buffer.duration * 1000);
-      const startAt = performance.now();
+      let activeElapsedMs = 0;
+      let lastTickAt = performance.now();
       progIntervalRef.current = window.setInterval(() => {
+        const now = performance.now();
         if (cancelledRef.current) {
           if (progIntervalRef.current !== null) window.clearInterval(progIntervalRef.current);
           return;
         }
         if (!pausedRef.current) {
-          const elapsed = performance.now() - startAt;
-          setProgressPct(Math.min(99, Math.round((elapsed / durationMs) * 100)));
+          activeElapsedMs += now - lastTickAt;
+          setProgressPct(Math.min(99, Math.round((activeElapsedMs / durationMs) * 100)));
         }
+        lastTickAt = now;
       }, 80);
 
       source.onended = () => {

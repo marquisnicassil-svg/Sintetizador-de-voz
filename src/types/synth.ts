@@ -92,6 +92,7 @@ export interface AndroidAppConfig {
   darkMode: boolean;
   backendUrl: string;
   statusBarOffsetPx: number;
+  statusBarCustom?: boolean;
 }
 
 export interface DiagnosticItem {

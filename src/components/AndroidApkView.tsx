@@ -187,7 +187,9 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => onUpdateConfig({ statusBarOffsetPx: opt.value })}
+                  onClick={() =>
+                    onUpdateConfig({ statusBarOffsetPx: opt.value, statusBarCustom: true })
+                  }
                   className={`min-h-[42px] px-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
                     config.statusBarOffsetPx === opt.value
                       ? 'bg-orange-500 text-white'
@@ -199,6 +201,15 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+          <p className="font-semibold">
+            Sobre &ldquo;Mecanismo preferencial&rdquo; nas Configurações do Android:
+          </p>
+          <p className="leading-relaxed">
+            Conversores Web-para-APK não fornecem leitura nativa ao TalkBack; se o app aparecer lá emitindo bipe/ruído, selecione <strong>Reconhecimento e síntese de voz do Google</strong> ou <strong>RHVoice</strong> nas configurações do sistema. Para registrá-lo nativamente no sistema, use o arquivo <code className="font-mono-tabular">android-configs/VozSynthTtsService.kt</code> ao compilar pelo Capacitor/Android Studio.
+          </p>
         </div>
       </section>
 
