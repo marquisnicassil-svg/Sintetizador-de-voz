@@ -1,0 +1,25 @@
+{
+  "appId": "com.vozsynth.android",
+  "appName": "VozSynth Android",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "backgroundColor": "#0e1116",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#0e1116",
+    "overrideUserAgent": "VozSynthAndroid/1.0 CapacitorWebView"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 400,
+      "backgroundColor": "#0e1116",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0e1116"
+    }
+  }
+}

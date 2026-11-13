@@ -1,0 +1,6 @@
+{
+  "name": "VozSynth Android",
+  "description": "Sintetizador de voz e locução offline 100% otimizado para Android e compilação em APK.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
