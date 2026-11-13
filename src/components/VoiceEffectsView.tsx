@@ -211,7 +211,7 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
           <div className="space-y-3">
             {!hasRemoteBackend && (
               <p className="text-xs text-stone-600 dark:text-stone-400 bg-stone-100 dark:bg-[#0e1116] rounded-xl px-3 py-2">
-                Modo APK / Estático: o botão Ouvir usa síntese local automática no celular. Para voz neural em nuvem, informe a URL do servidor na aba APK.
+                Modo offline do APK: o botão Ouvir sintetiza localmente no aparelho. Para voz neural em nuvem, informe a URL do servidor na aba APK.
               </p>
             )}
             <div className="divide-y divide-stone-100 dark:divide-slate-800/80 rounded-xl border border-stone-200 dark:border-slate-800 max-h-80 overflow-y-auto">
@@ -375,7 +375,7 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
                 <div className="p-4 text-center text-xs text-stone-500 dark:text-stone-400 space-y-1">
                   <p>
                     {voices.length === 0
-                      ? 'Este WebView do APK não expõe vozes nativas do Android (comum em conversores simples de APK).'
+                      ? 'Nenhuma voz nativa foi exposta diretamente por este APK.'
                       : 'Nenhuma voz nativa encontrada neste filtro.'}
                   </p>
                   <p>

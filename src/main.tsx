@@ -46,7 +46,7 @@ class AppErrorBoundary extends React.Component<
           <div className="max-w-sm w-full rounded-2xl bg-[#151a22] border border-slate-800 p-5 space-y-3 text-center">
             <h1 className="text-base font-bold text-white">VozSynth Android</h1>
             <p className="text-xs text-stone-300">
-              Ocorreu um erro ao iniciar o aplicativo neste navegador: {this.state.errorMessage}
+              Ocorreu um erro ao iniciar o aplicativo neste dispositivo: {this.state.errorMessage}
             </p>
             <button
               type="button"

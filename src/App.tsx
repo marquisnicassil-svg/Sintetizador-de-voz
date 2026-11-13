@@ -12,7 +12,6 @@ import { AiAssistantView } from './components/AiAssistantView';
 import { AndroidApkView } from './components/AndroidApkView';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PhrasesHistoryView } from './components/PhrasesHistoryView';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { StudioView } from './components/StudioView';
 import { VoiceEffectsView } from './components/VoiceEffectsView';
 import { useSpeechEngine } from './hooks/useSpeechEngine';
@@ -301,7 +300,6 @@ export default function App() {
             >
               {androidConfig.darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            <PWAInstallButton />
           </div>
         </div>
       </header>

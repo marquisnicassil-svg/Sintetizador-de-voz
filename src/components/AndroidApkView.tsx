@@ -213,25 +213,25 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
         </div>
       </section>
 
-      {/* GitHub Pages & Remote Backend Connection */}
+      {/* Remote Backend Connection */}
       <section className="rounded-2xl bg-white dark:bg-[#151a22] border border-stone-200 dark:border-slate-800 p-4 space-y-3">
         <div className="flex items-start gap-2.5">
           <Globe className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
           <div>
             <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
-              GitHub Pages e Servidor IA Remoto
+              Servidor IA Remoto (Opcional)
             </h2>
             <p className="text-xs text-stone-500 dark:text-stone-400">
               {isStaticHost
-                ? 'Executando em hospedagem estática: Voz Nativa e DSP Offline estão ativos sem servidor.'
-                : 'Workflow automático incluído (.github/workflows/deploy-pages.yml) para testar no GitHub Pages.'}
+                ? 'Modo offline do APK ativo: as vozes locais funcionam sem servidor.'
+                : 'Conecte um servidor de voz neural para sintetizar áudios em nuvem no APK.'}
             </p>
           </div>
         </div>
 
         <div className="space-y-2">
           <label className="block text-xs font-medium text-stone-600 dark:text-stone-400">
-            URL do Backend para Vozes IA (opcional no GitHub Pages / APK)
+            URL do Backend para Vozes IA (opcional no APK offline)
           </label>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -265,12 +265,12 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
         </div>
       </section>
 
-      {/* Real Device & WebView Diagnostics */}
+      {/* Real Device Diagnostics */}
       <section className="rounded-2xl bg-white dark:bg-[#151a22] border border-stone-200 dark:border-slate-800 p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
-              Diagnóstico do Aparelho / WebView
+              Diagnóstico do Aparelho Android
             </h2>
             <p className="text-xs text-stone-500 dark:text-stone-400">
               Verificação real dos recursos de áudio, offline e APK neste dispositivo

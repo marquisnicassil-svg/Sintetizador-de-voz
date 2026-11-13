@@ -100,10 +100,25 @@ export function getCapacitorTtsPlugin(): CapacitorTtsPlugin | null {
   return plugin && typeof plugin.speak === 'function' ? plugin : null;
 }
 
+export interface AndroidNativeTtsBridge {
+  isReady?: () => boolean;
+  speak: (text: string, rate: number, pitch: number) => boolean;
+  stop?: () => void;
+}
+
+export function getAndroidNativeTtsBridge(): AndroidNativeTtsBridge | null {
+  if (typeof window === 'undefined') return null;
+  const bridge = (window as unknown as { AndroidTTS?: AndroidNativeTtsBridge }).AndroidTTS;
+  if (!bridge || typeof bridge.speak !== 'function') return null;
+  if (typeof bridge.isReady === 'function' && !bridge.isReady()) return null;
+  return bridge;
+}
+
 export function runAndroidDiagnostics(): DiagnosticItem[] {
   const hasWindow = typeof window !== 'undefined';
   const hasNav = typeof navigator !== 'undefined';
 
+  const hasAndroidBridge = !!getAndroidNativeTtsBridge();
   const hasCapTts = !!getCapacitorTtsPlugin();
   const hasSpeech = hasWindow && 'speechSynthesis' in window;
   const voiceCount = hasSpeech ? window.speechSynthesis.getVoices().length : 0;
@@ -119,63 +134,61 @@ export function runAndroidDiagnostics(): DiagnosticItem[] {
   const hasVibrate = hasNav && 'vibrate' in navigator;
   const hasShare = hasNav && 'share' in navigator;
   const isAndroidUA = hasNav && /android/i.test(navigator.userAgent);
-  const isStandalone =
-    hasWindow &&
-    (window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as unknown as { standalone?: boolean }).standalone === true);
 
   return [
     {
       id: 'tts',
-      label: 'Android / Web Speech TTS',
-      supported: hasCapTts || voiceCount > 0,
-      detail: hasCapTts
-        ? 'Plugin nativo Capacitor TextToSpeech ativo'
-        : hasSpeech && voiceCount > 0
-          ? `${voiceCount} vozes detectadas no sistema`
-          : 'WebView sem vozes nativas — fallback automático DSP Offline ativo',
+      label: 'Motor de Voz Nativo Android',
+      supported: hasAndroidBridge || hasCapTts || voiceCount > 0,
+      detail: hasAndroidBridge
+        ? 'Bridge nativo AndroidTTS ativo'
+        : hasCapTts
+          ? 'Plugin nativo Capacitor TextToSpeech ativo'
+          : voiceCount > 0
+            ? `${voiceCount} vozes detectadas no sistema Android`
+            : 'Motor offline integrado ativo neste aparelho',
     },
     {
       id: 'webaudio',
       label: 'Sintetizador DSP & Exportador WAV',
       supported: hasAudioCtx,
-      detail: hasAudioCtx ? 'Web Audio + OfflineAudioContext ativos' : 'AudioContext indisponível',
+      detail: hasAudioCtx ? 'Motor de áudio e exportação .WAV ativos' : 'Áudio indisponível neste aparelho',
     },
     {
       id: 'sw',
-      label: 'Cache Offline (Service Worker)',
+      label: 'Cache Offline do Aplicativo',
       supported: hasSW,
-      detail: hasSW ? 'Pronto para funcionamento 100% offline' : 'Service Worker bloqueado',
+      detail: hasSW ? 'Pronto para funcionamento 100% offline' : 'Armazenamento local ativo',
     },
     {
       id: 'wakelock',
       label: 'WakeLock (Tela Ativa)',
       supported: hasWakeLock,
-      detail: hasWakeLock ? 'Evita suspensão em leituras longas' : 'Usar keepScreenOn no AndroidManifest',
+      detail: hasWakeLock ? 'Evita suspensão em leituras longas' : 'Controlado via AndroidManifest',
     },
     {
       id: 'mediasession',
       label: 'Controles na Tela de Bloqueio',
       supported: hasMediaSession,
-      detail: hasMediaSession ? 'MediaSession API suportada' : 'Indisponível neste ambiente',
+      detail: hasMediaSession ? 'MediaSession ativa no sistema' : 'Indisponível neste aparelho',
     },
     {
       id: 'share',
-      label: 'Android Share Sheet (Áudio WAV)',
+      label: 'Compartilhar Áudio (.WAV)',
       supported: hasShare,
-      detail: hasShare ? 'Compartilhamento nativo habilitado' : 'Download direto de arquivo .WAV ativo',
+      detail: hasShare ? 'Menu de compartilhamento Android ativo' : 'Salvamento direto em arquivo .WAV ativo',
     },
     {
       id: 'vibrate',
       label: 'Feedback Háptico (Vibração)',
       supported: hasVibrate,
-      detail: hasVibrate ? 'Motor de vibração acessível' : 'Indisponível neste dispositivo',
+      detail: hasVibrate ? 'Motor de vibração acessível' : 'Indisponível neste aparelho',
     },
     {
       id: 'env',
-      label: 'Ambiente Detectado',
+      label: 'Plataforma do Aplicativo',
       supported: true,
-      detail: `${isAndroidUA ? 'Android' : 'Desktop / Outro'} · ${isStandalone ? 'Modo App Instalado' : 'Navegador Web'}`,
+      detail: `${isAndroidUA ? 'Android' : 'Sistema'} · Modo Aplicativo Otimizado`,
     },
   ];
 }
@@ -293,24 +306,34 @@ export function resolveApiUrl(apiPath: string, backendUrl?: string): string {
 export async function postApiJson<T>(
   apiPath: string,
   payload: unknown,
-  backendUrl?: string
+  backendUrl?: string,
+  timeoutMs = 5000
 ): Promise<T> {
   const url = resolveApiUrl(apiPath, backendUrl);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timer);
+  }
 
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
     if (isStaticHostingEnvironment() && !backendUrl?.trim()) {
       throw new Error(
-        'Hospedagem estática detectada (GitHub Pages / APK offline). As Vozes Nativas e o Pacote DSP Offline funcionam normalmente; para Vozes IA, informe a URL do servidor backend na aba APK.'
+        'Aplicativo em modo offline local. As vozes locais funcionam sem internet; para usar a IA na nuvem, informe a URL do servidor na aba APK.'
       );
     }
     throw new Error(
-      `Servidor de IA indisponível neste endereço (HTTP ${response.status}). Use o Pacote DSP Offline ou Voz Nativa.`
+      `Servidor de IA indisponível neste endereço (HTTP ${response.status}). Usando síntese local.`
     );
   }
 
