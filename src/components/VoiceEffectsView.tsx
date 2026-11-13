@@ -3,10 +3,12 @@ import { Check, Loader2, Play, Plus, RotateCcw, Search, Square, Trash2, Volume2 
 import { AI_VOICE_PACK, DSP_VOICE_PACK } from '../data/voicePacks';
 import type { PlaybackStatus } from '../hooks/useSpeechEngine';
 import type { DspVoicePreset, PronunciationRule, VoiceSettings } from '../types/synth';
+import { isStaticHostingEnvironment } from '../utils/androidHelpers';
 
 interface VoiceEffectsViewProps {
   voices: SpeechSynthesisVoice[];
   settings: VoiceSettings;
+  backendUrl?: string;
   status: PlaybackStatus;
   activeChunkText: string;
   errorMsg: string | null;
@@ -31,6 +33,7 @@ const LANG_TABS = [
 export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
   voices,
   settings,
+  backendUrl,
   status,
   activeChunkText,
   errorMsg,
@@ -44,7 +47,10 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
   onToggleRule,
   onDeleteRule,
 }) => {
-  const [packTab, setPackTab] = useState<'ai' | 'dsp' | 'android'>('ai');
+  const hasRemoteBackend = !isStaticHostingEnvironment() || !!backendUrl?.trim();
+  const [packTab, setPackTab] = useState<'ai' | 'dsp' | 'android'>(() =>
+    hasRemoteBackend ? 'ai' : 'dsp'
+  );
   const [testingId, setTestingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [fromWord, setFromWord] = useState('');
@@ -203,6 +209,11 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
         {/* Tab 1: Gemini Neural AI Voice Pack */}
         {packTab === 'ai' && (
           <div className="space-y-3">
+            {!hasRemoteBackend && (
+              <p className="text-xs text-stone-600 dark:text-stone-400 bg-stone-100 dark:bg-[#0e1116] rounded-xl px-3 py-2">
+                Modo APK / Estático: o botão Ouvir usa síntese local automática no celular. Para voz neural em nuvem, informe a URL do servidor na aba APK.
+              </p>
+            )}
             <div className="divide-y divide-stone-100 dark:divide-slate-800/80 rounded-xl border border-stone-200 dark:border-slate-800 max-h-80 overflow-y-auto">
               {AI_VOICE_PACK.map((voice) => {
                 const isSelected =
@@ -361,8 +372,17 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
 
             <div className="max-h-60 overflow-y-auto divide-y divide-stone-100 dark:divide-slate-800/80 rounded-xl border border-stone-200 dark:border-slate-800">
               {filteredVoices.length === 0 ? (
-                <div className="p-4 text-center text-xs text-stone-500 dark:text-stone-400">
-                  Nenhuma voz nativa encontrada neste filtro. Selecione &ldquo;Todas&rdquo; ou use Vozes IA / DSP Offline.
+                <div className="p-4 text-center text-xs text-stone-500 dark:text-stone-400 space-y-1">
+                  <p>
+                    {voices.length === 0
+                      ? 'Este WebView do APK não expõe vozes nativas do Android (comum em conversores simples de APK).'
+                      : 'Nenhuma voz nativa encontrada neste filtro.'}
+                  </p>
+                  <p>
+                    {voices.length === 0
+                      ? 'Ao clicar em Testar ou usar DSP Offline, o aplicativo sintetiza áudio localmente sem depender do sistema.'
+                      : 'Selecione "Todas" ou use DSP Offline.'}
+                  </p>
                 </div>
               ) : (
                 filteredVoices.map((voice) => {

@@ -252,11 +252,22 @@ export default function App() {
     }
   };
 
+  const statusBarTopClass =
+    androidConfig.statusBarOffsetPx >= 40
+      ? 'pt-10'
+      : androidConfig.statusBarOffsetPx >= 32
+        ? 'pt-8'
+        : androidConfig.statusBarOffsetPx >= 24
+          ? 'pt-6'
+          : 'pt-safe';
+
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-[#0e1116] text-stone-900 dark:text-stone-100 flex flex-col">
-      {/* Compact Sticky Header (48px mobile height <= 15% sticky budget with 60px bottom bar) */}
-      <header className="sticky top-0 z-30 h-12 lg:h-14 bg-stone-50/90 dark:bg-[#0e1116]/90 backdrop-blur-md border-b border-stone-200 dark:border-slate-800/90">
-        <div className="max-w-6xl mx-auto h-full px-4 flex items-center justify-between gap-8">
+      {/* Compact Sticky Header with Android WebView status bar clearance */}
+      <header
+        className={`sticky top-0 z-30 ${statusBarTopClass} bg-stone-50/90 dark:bg-[#0e1116]/90 backdrop-blur-md border-b border-stone-200 dark:border-slate-800/90`}
+      >
+        <div className="max-w-6xl mx-auto h-12 lg:h-14 px-4 flex items-center justify-between gap-8">
           <span className="text-base lg:text-lg font-bold tracking-tight text-stone-900 dark:text-white whitespace-nowrap shrink-0">
             VozSynth
           </span>
@@ -328,6 +339,7 @@ export default function App() {
               <VoiceEffectsView
                 voices={voices}
                 settings={settings}
+                backendUrl={androidConfig.backendUrl}
                 status={status}
                 activeChunkText={activeChunkText}
                 errorMsg={errorMsg}
@@ -397,6 +409,7 @@ export default function App() {
               <VoiceEffectsView
                 voices={voices}
                 settings={settings}
+                backendUrl={androidConfig.backendUrl}
                 status={status}
                 activeChunkText={activeChunkText}
                 errorMsg={errorMsg}

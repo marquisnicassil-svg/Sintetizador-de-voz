@@ -17,8 +17,35 @@ const KEYS = {
   AI_CHAT: 'vozsynth_ai_chat_v1',
 } as const;
 
+function detectInitialEngineMode(): VoiceSettings['engineMode'] {
+  if (typeof window === 'undefined') return 'native-tts';
+  const { hostname, protocol } = window.location;
+  const isStaticOrApk =
+    hostname.endsWith('github.io') ||
+    protocol === 'file:' ||
+    protocol === 'capacitor:' ||
+    protocol === 'ionic:';
+  if (isStaticOrApk) {
+    const hasVoices =
+      'speechSynthesis' in window && window.speechSynthesis.getVoices().length > 0;
+    return hasVoices ? 'native-tts' : 'dsp-formant';
+  }
+  return 'native-tts';
+}
+
+function detectInitialStatusBarOffset(): number {
+  if (typeof window === 'undefined') return 0;
+  const ua = navigator.userAgent || '';
+  const isAndroid = /android/i.test(ua);
+  const isWebView = /;\s*wv\)/i.test(ua) || window.location.protocol === 'file:' || window.location.protocol === 'capacitor:';
+  const isFullscreen =
+    window.matchMedia?.('(display-mode: fullscreen)').matches ||
+    (window.screen && Math.abs(window.screen.height - window.innerHeight) <= 24);
+  return isAndroid && (isFullscreen || isWebView) ? 32 : 0;
+}
+
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  engineMode: 'native-tts',
+  engineMode: detectInitialEngineMode(),
   selectedVoiceURI: '',
   languageFilter: 'pt',
   rate: 1.0,
@@ -48,6 +75,7 @@ export const DEFAULT_ANDROID_CONFIG: AndroidAppConfig = {
   mediaSessionEnabled: true,
   darkMode: true,
   backendUrl: '',
+  statusBarOffsetPx: detectInitialStatusBarOffset(),
 };
 
 export const DEFAULT_PRONUNCIATION_RULES: PronunciationRule[] = [

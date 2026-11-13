@@ -1,10 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AI_VOICE_PACK } from '../data/voicePacks';
 import type { AndroidAppConfig, PronunciationRule, VoiceSettings } from '../types/synth';
-import { applyPronunciationRules, postApiJson, splitIntoSpeechChunks, triggerHaptic } from '../utils/androidHelpers';
+import {
+  applyPronunciationRules,
+  getCapacitorTtsPlugin,
+  isStaticHostingEnvironment,
+  postApiJson,
+  splitIntoSpeechChunks,
+  triggerHaptic,
+} from '../utils/androidHelpers';
 import { audioBufferToWavBlob, renderDspSpeechBuffer } from '../utils/dspFormantEngine';
 
 export type PlaybackStatus = 'idle' | 'rendering' | 'speaking' | 'paused';
+
+const AI_LOCAL_PROFILES: Record<
+  string,
+  Pick<VoiceSettings, 'dspTimbre' | 'dspBaseFreq' | 'pitch' | 'rate' | 'dspVibrato' | 'dspEcho'>
+> = {
+  'clara-jornal': { dspTimbre: 'natural', dspBaseFreq: 196, pitch: 1.08, rate: 1.02, dspVibrato: 0.22, dspEcho: 0.08 },
+  'lucas-dinamico': { dspTimbre: 'natural', dspBaseFreq: 132, pitch: 1.04, rate: 1.12, dspVibrato: 0.2, dspEcho: 0.06 },
+  'bruno-doc': { dspTimbre: 'deep', dspBaseFreq: 90, pitch: 0.86, rate: 0.9, dspVibrato: 0.14, dspEcho: 0.16 },
+  'rafael-epico': { dspTimbre: 'deep', dspBaseFreq: 96, pitch: 0.9, rate: 0.96, dspVibrato: 0.18, dspEcho: 0.22 },
+  'sofia-suave': { dspTimbre: 'natural', dspBaseFreq: 210, pitch: 1.12, rate: 0.96, dspVibrato: 0.28, dspEcho: 0.12 },
+  'helena-livro': { dspTimbre: 'natural', dspBaseFreq: 186, pitch: 1.05, rate: 0.94, dspVibrato: 0.3, dspEcho: 0.14 },
+  'mateus-podcast': { dspTimbre: 'natural', dspBaseFreq: 122, pitch: 0.98, rate: 1.06, dspVibrato: 0.18, dspEcho: 0.08 },
+  'beatriz-ura': { dspTimbre: 'natural', dspBaseFreq: 202, pitch: 1.1, rate: 1.0, dspVibrato: 0.14, dspEcho: 0.05 },
+  'diogo-radio': { dspTimbre: 'radio', dspBaseFreq: 138, pitch: 1.04, rate: 1.14, dspVibrato: 0.16, dspEcho: 0.1 },
+  'valentina-asmr': { dspTimbre: 'whisper', dspBaseFreq: 175, pitch: 1.05, rate: 0.84, dspVibrato: 0.12, dspEcho: 0.22 },
+};
+
+function mapAiVoiceToLocalSettings(aiVoiceId: string, base: VoiceSettings): VoiceSettings {
+  const profile = AI_LOCAL_PROFILES[aiVoiceId];
+  if (!profile) return base;
+  return {
+    ...base,
+    ...profile,
+  };
+}
 
 interface UseSpeechEngineArgs {
   settings: VoiceSettings;
@@ -148,6 +180,11 @@ export function useSpeechEngine({
       }
     }
 
+    const capTts = getCapacitorTtsPlugin();
+    if (capTts?.stop) {
+      void capTts.stop().catch(() => {});
+    }
+
     if (activeSourceRef.current) {
       try {
         activeSourceRef.current.stop();
@@ -284,11 +321,111 @@ export function useSpeechEngine({
     [androidConfig.appName, androidConfig.mediaSessionEnabled, ensureUnlockedAudioContext, onSpokenComplete, releaseWakeLock]
   );
 
-  const speakNativeTts = useCallback(
-    async (rawText: string, effSettings: VoiceSettings) => {
-      if (!('speechSynthesis' in window)) {
-        setErrorMsg('Voz nativa do sistema indisponível neste navegador. Use Voz IA Neural ou DSP Offline.');
+  const speakDspFormant = useCallback(
+    async (rawText: string, effSettings: VoiceSettings, customLabel?: string) => {
+      setStatus('rendering');
+      setActiveChunkText(customLabel || 'Sintetizando áudio offline...');
+      setProgressPct(18);
+
+      const processed = applyPronunciationRules(rawText, rules);
+      try {
+        const buffer = await renderDspSpeechBuffer(processed, effSettings);
+        if (cancelledRef.current) return;
+
+        const wavBlob = audioBufferToWavBlob(buffer);
+        lastRenderedWavRef.current = {
+          cacheKey: `dsp:${effSettings.dspVoiceId}:${rawText}`,
+          blob: wavBlob,
+        };
+
+        await playAudioBufferWithAnalyser(
+          buffer,
+          customLabel
+            ? `${customLabel} · ${rawText.slice(0, 110)}${rawText.length > 110 ? '…' : ''}`
+            : rawText.slice(0, 140) + (rawText.length > 140 ? '…' : ''),
+          rawText,
+          customLabel || `DSP Offline · ${effSettings.dspTimbre}`,
+          effSettings.volume
+        );
+      } catch {
+        setErrorMsg('Não foi possível sintetizar o áudio DSP neste aparelho.');
         setStatus('idle');
+        setAnalyserNode(null);
+        releaseWakeLock();
+      }
+    },
+    [playAudioBufferWithAnalyser, releaseWakeLock, rules]
+  );
+
+  const speakNativeTts = useCallback(
+    async (rawText: string, effSettings: VoiceSettings, customLabel?: string) => {
+      const processed = applyPronunciationRules(rawText, rules);
+      const chunks = splitIntoSpeechChunks(processed, effSettings.pauseBetweenSentencesMs);
+      if (chunks.length === 0) {
+        setStatus('idle');
+        return;
+      }
+
+      // 1) Try native Capacitor TextToSpeech plugin first when running inside Capacitor APK
+      const capTts = getCapacitorTtsPlugin();
+      if (capTts) {
+        setStatus('speaking');
+        setProgressPct(8);
+        const speechTotal = chunks.filter((c) => c.type === 'speech').length || 1;
+        let done = 0;
+        try {
+          for (const chunk of chunks) {
+            if (cancelledRef.current) break;
+            if (chunk.type === 'pause') {
+              await new Promise<void>((resolve) => {
+                pauseTimerRef.current = window.setTimeout(() => {
+                  pauseTimerRef.current = null;
+                  resolve();
+                }, chunk.pauseMs || 300);
+              });
+              continue;
+            }
+            const chunkText = chunk.text || '';
+            setActiveChunkText(customLabel ? `${customLabel} · ${chunkText}` : chunkText);
+            await capTts.speak({
+              text: chunkText,
+              lang: 'pt-BR',
+              rate: effSettings.rate,
+              pitch: effSettings.pitch,
+              volume: effSettings.volume,
+              category: 'ambient',
+            });
+            done += 1;
+            setProgressPct(Math.round((done / speechTotal) * 100));
+          }
+          if (!cancelledRef.current) {
+            onSpokenComplete?.(rawText);
+          }
+          setStatus('idle');
+          setActiveChunkText('');
+          setProgressPct(0);
+          releaseWakeLock();
+          return;
+        } catch {
+          if (cancelledRef.current) return;
+          // Fall through to Web Speech / DSP Offline if Capacitor TTS fails
+        }
+      }
+
+      // 2) Check Web Speech API voices (many simple APK WebViews return 0 voices)
+      const hasSpeechApi = typeof window !== 'undefined' && 'speechSynthesis' in window;
+      const currentVoices = hasSpeechApi
+        ? voices.length > 0
+          ? voices
+          : window.speechSynthesis.getVoices()
+        : [];
+
+      if (!hasSpeechApi || currentVoices.length === 0) {
+        await speakDspFormant(
+          rawText,
+          effSettings,
+          customLabel || 'Modo offline (WebView sem voz nativa)'
+        );
         return;
       }
 
@@ -300,16 +437,6 @@ export function useSpeechEngine({
       }
       if (cancelledRef.current) return;
 
-      const processed = applyPronunciationRules(rawText, rules);
-      const chunks = splitIntoSpeechChunks(processed, effSettings.pauseBetweenSentencesMs);
-
-      if (chunks.length === 0) {
-        setStatus('idle');
-        return;
-      }
-
-      const currentVoices =
-        voices.length > 0 ? voices : window.speechSynthesis.getVoices();
       const chosenVoice =
         currentVoices.find((v) => v.voiceURI === effSettings.selectedVoiceURI) ||
         currentVoices.find((v) => v.lang.toLowerCase().startsWith('pt')) ||
@@ -317,12 +444,13 @@ export function useSpeechEngine({
 
       const speechTotal = chunks.filter((c) => c.type === 'speech').length || 1;
       let completedSpeech = 0;
+      let shouldFallbackToDsp = false;
 
       setStatus('speaking');
       setProgressPct(4);
 
       for (let i = 0; i < chunks.length; i++) {
-        if (cancelledRef.current) break;
+        if (cancelledRef.current || shouldFallbackToDsp) break;
 
         const chunk = chunks[i];
         if (chunk.type === 'pause') {
@@ -336,7 +464,7 @@ export function useSpeechEngine({
         }
 
         const chunkText = chunk.text || '';
-        setActiveChunkText(chunkText);
+        setActiveChunkText(customLabel ? `${customLabel} · ${chunkText}` : chunkText);
 
         await new Promise<void>((resolve) => {
           if (cancelledRef.current) {
@@ -368,12 +496,10 @@ export function useSpeechEngine({
           // Safety timeout if WebView silently drops utterance without firing onend/onerror
           const fallbackTimer = window.setTimeout(() => {
             if (!started && !settled) {
-              setErrorMsg(
-                'O motor de voz nativa do aparelho não respondeu. Use as Vozes IA ou o Pacote DSP Offline.'
-              );
+              shouldFallbackToDsp = true;
               finish();
             }
-          }, 2500);
+          }, 1800);
 
           utter.onstart = () => {
             started = true;
@@ -382,9 +508,7 @@ export function useSpeechEngine({
           utter.onend = finish;
           utter.onerror = (ev) => {
             if (ev.error !== 'interrupted' && ev.error !== 'canceled') {
-              setErrorMsg(
-                `Voz nativa indisponível (${ev.error}). Experimente as Vozes IA ou DSP Offline.`
-              );
+              shouldFallbackToDsp = true;
             }
             finish();
           };
@@ -395,8 +519,14 @@ export function useSpeechEngine({
           }
         });
 
+        if (shouldFallbackToDsp) break;
         completedSpeech += 1;
         setProgressPct(Math.round((completedSpeech / speechTotal) * 100));
+      }
+
+      if (shouldFallbackToDsp && !cancelledRef.current) {
+        await speakDspFormant(rawText, effSettings, customLabel || 'Fallback automático DSP');
+        return;
       }
 
       if (!cancelledRef.current) {
@@ -407,41 +537,7 @@ export function useSpeechEngine({
       setProgressPct(0);
       releaseWakeLock();
     },
-    [onSpokenComplete, releaseWakeLock, rules, voices]
-  );
-
-  const speakDspFormant = useCallback(
-    async (rawText: string, effSettings: VoiceSettings) => {
-      setStatus('rendering');
-      setActiveChunkText('Sintetizando formantes offline...');
-      setProgressPct(15);
-
-      const processed = applyPronunciationRules(rawText, rules);
-      try {
-        const buffer = await renderDspSpeechBuffer(processed, effSettings);
-        if (cancelledRef.current) return;
-
-        const wavBlob = audioBufferToWavBlob(buffer);
-        lastRenderedWavRef.current = {
-          cacheKey: `dsp:${effSettings.dspVoiceId}:${rawText}`,
-          blob: wavBlob,
-        };
-
-        await playAudioBufferWithAnalyser(
-          buffer,
-          rawText.slice(0, 140) + (rawText.length > 140 ? '…' : ''),
-          rawText,
-          `DSP Offline · ${effSettings.dspTimbre}`,
-          effSettings.volume
-        );
-      } catch {
-        setErrorMsg('Não foi possível sintetizar o áudio DSP neste aparelho.');
-        setStatus('idle');
-        setAnalyserNode(null);
-        releaseWakeLock();
-      }
-    },
-    [playAudioBufferWithAnalyser, releaseWakeLock, rules]
+    [onSpokenComplete, releaseWakeLock, rules, speakDspFormant, voices]
   );
 
   const requestNeuralAiWav = useCallback(
@@ -483,10 +579,48 @@ export function useSpeechEngine({
     [androidConfig.backendUrl, rules]
   );
 
+  const speakAiLocalFallback = useCallback(
+    async (rawText: string, effSettings: VoiceSettings, presetName: string) => {
+      const localSettings = mapAiVoiceToLocalSettings(effSettings.aiVoiceId, effSettings);
+      const fullText =
+        effSettings.dualSpeakerMode && effSettings.secondText.trim()
+          ? `${rawText}. ${effSettings.secondText.trim()}`
+          : rawText;
+
+      const hasCapTts = !!getCapacitorTtsPlugin();
+      const hasWebVoices =
+        typeof window !== 'undefined' &&
+        'speechSynthesis' in window &&
+        (voices.length > 0 || window.speechSynthesis.getVoices().length > 0);
+
+      if (hasCapTts || hasWebVoices) {
+        await speakNativeTts(
+          fullText,
+          localSettings,
+          `Offline · Voz local (${presetName})`
+        );
+      } else {
+        await speakDspFormant(
+          fullText,
+          localSettings,
+          `Offline · Formante local (${presetName})`
+        );
+      }
+    },
+    [speakDspFormant, speakNativeTts, voices.length]
+  );
+
   const speakNeuralAi = useCallback(
     async (rawText: string, effSettings: VoiceSettings) => {
       const preset =
         AI_VOICE_PACK.find((v) => v.id === effSettings.aiVoiceId) || AI_VOICE_PACK[0];
+
+      // In GitHub Pages / APK without a backend URL configured, seamlessly synthesize locally instead of failing
+      if (isStaticHostingEnvironment() && !androidConfig.backendUrl.trim()) {
+        await speakAiLocalFallback(rawText, effSettings, preset.name);
+        return;
+      }
+
       setStatus('rendering');
       setActiveChunkText(`Gerando voz neural (${preset.name})...`);
       setProgressPct(22);
@@ -514,18 +648,19 @@ export function useSpeechEngine({
           `Voz IA · ${preset.name}`,
           effSettings.volume
         );
-      } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : 'Falha na Voz Neural IA. Verifique sua conexão ou use o modo Offline.';
-        setErrorMsg(msg);
-        setStatus('idle');
-        setAnalyserNode(null);
-        releaseWakeLock();
+      } catch {
+        if (cancelledRef.current) return;
+        // Seamless automatic fallback so clicking "Ouvir" or "Falar" always produces audio
+        await speakAiLocalFallback(rawText, effSettings, preset.name);
       }
     },
-    [ensureUnlockedAudioContext, playAudioBufferWithAnalyser, releaseWakeLock, requestNeuralAiWav]
+    [
+      androidConfig.backendUrl,
+      ensureUnlockedAudioContext,
+      playAudioBufferWithAnalyser,
+      requestNeuralAiWav,
+      speakAiLocalFallback,
+    ]
   );
 
   const speak = useCallback(
@@ -603,15 +738,29 @@ export function useSpeechEngine({
 
         if (lastRenderedWavRef.current && lastRenderedWavRef.current.cacheKey === expectedKey) {
           blob = lastRenderedWavRef.current.blob;
-        } else if (settings.engineMode === 'ai-neural') {
+        } else if (
+          settings.engineMode === 'ai-neural' &&
+          (!isStaticHostingEnvironment() || !!androidConfig.backendUrl.trim())
+        ) {
           setStatus('rendering');
           setActiveChunkText('Exportando áudio neural .WAV...');
-          blob = await requestNeuralAiWav(trimmed, settings);
+          try {
+            blob = await requestNeuralAiWav(trimmed, settings);
+          } catch {
+            const processed = applyPronunciationRules(trimmed, rules);
+            const localSettings = mapAiVoiceToLocalSettings(settings.aiVoiceId, settings);
+            const buffer = await renderDspSpeechBuffer(processed, localSettings);
+            blob = audioBufferToWavBlob(buffer);
+          }
           setStatus('idle');
           setActiveChunkText('');
         } else {
           const processed = applyPronunciationRules(trimmed, rules);
-          const buffer = await renderDspSpeechBuffer(processed, settings);
+          const localSettings =
+            settings.engineMode === 'ai-neural'
+              ? mapAiVoiceToLocalSettings(settings.aiVoiceId, settings)
+              : settings;
+          const buffer = await renderDspSpeechBuffer(processed, localSettings);
           blob = audioBufferToWavBlob(buffer);
         }
 

@@ -27,7 +27,7 @@ interface AndroidApkViewProps {
 
 const CAPACITOR_BUILD_COMMANDS = `npm install
 npm run build
-npm install @capacitor/core @capacitor/cli @capacitor/android
+npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor-community/text-to-speech
 npx cap add android
 npx cap sync android
 cd android && ./gradlew assembleRelease`;
@@ -166,6 +166,39 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
               </button>
             </div>
           ))}
+
+          {/* Status Bar Offset Selector for Fullscreen APK WebViews */}
+          <div className="pt-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                Espaço p/ Barra de Status (APK Tela Cheia)
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400">
+                Ajuste caso o topo do app fique em cima da hora do celular no criador de APK
+              </p>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {[
+                { label: '0 px', value: 0 },
+                { label: '24 px', value: 24 },
+                { label: '32 px', value: 32 },
+                { label: '40 px', value: 40 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onUpdateConfig({ statusBarOffsetPx: opt.value })}
+                  className={`min-h-[42px] px-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                    config.statusBarOffsetPx === opt.value
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-stone-100 dark:bg-[#0e1116] text-stone-700 dark:text-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

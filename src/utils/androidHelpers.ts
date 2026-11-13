@@ -79,10 +79,32 @@ export function splitIntoSpeechChunks(text: string, defaultSentencePauseMs: numb
   return chunks;
 }
 
+export interface CapacitorTtsPlugin {
+  speak: (options: {
+    text: string;
+    lang?: string;
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+    category?: string;
+  }) => Promise<void>;
+  stop?: () => Promise<void>;
+}
+
+export function getCapacitorTtsPlugin(): CapacitorTtsPlugin | null {
+  if (typeof window === 'undefined') return null;
+  const cap = (window as unknown as {
+    Capacitor?: { Plugins?: { TextToSpeech?: CapacitorTtsPlugin } };
+  }).Capacitor;
+  const plugin = cap?.Plugins?.TextToSpeech;
+  return plugin && typeof plugin.speak === 'function' ? plugin : null;
+}
+
 export function runAndroidDiagnostics(): DiagnosticItem[] {
   const hasWindow = typeof window !== 'undefined';
   const hasNav = typeof navigator !== 'undefined';
 
+  const hasCapTts = !!getCapacitorTtsPlugin();
   const hasSpeech = hasWindow && 'speechSynthesis' in window;
   const voiceCount = hasSpeech ? window.speechSynthesis.getVoices().length : 0;
 
@@ -106,8 +128,12 @@ export function runAndroidDiagnostics(): DiagnosticItem[] {
     {
       id: 'tts',
       label: 'Android / Web Speech TTS',
-      supported: hasSpeech,
-      detail: hasSpeech ? `${voiceCount} vozes detectadas no sistema` : 'API indisponível neste navegador',
+      supported: hasCapTts || voiceCount > 0,
+      detail: hasCapTts
+        ? 'Plugin nativo Capacitor TextToSpeech ativo'
+        : hasSpeech && voiceCount > 0
+          ? `${voiceCount} vozes detectadas no sistema`
+          : 'WebView sem vozes nativas — fallback automático DSP Offline ativo',
     },
     {
       id: 'webaudio',

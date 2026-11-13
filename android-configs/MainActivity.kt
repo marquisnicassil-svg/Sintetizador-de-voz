@@ -3,13 +3,15 @@ package com.vozsynth.android
 import android.os.Bundle
 import android.view.WindowManager
 import android.webkit.WebSettings
+import androidx.core.view.WindowCompat
 import com.getcapacitor.BridgeActivity
 
 class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Mantém a tela ligada se necessário para leituras longas e melhora fluidez tátil
+        // Evita sobreposição da WebView com o relógio e ícones da barra de status do Android
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
 
         val webView = bridge?.webView ?: return

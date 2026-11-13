@@ -91,6 +91,7 @@ export interface AndroidAppConfig {
   mediaSessionEnabled: boolean;
   darkMode: boolean;
   backendUrl: string;
+  statusBarOffsetPx: number;
 }
 
 export interface DiagnosticItem {

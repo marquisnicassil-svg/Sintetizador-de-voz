@@ -127,22 +127,22 @@ function buildFormantSequence(text: string, rate: number): FormantTarget[] {
 function timbreModifiers(timbre: DspTimbre) {
   switch (timbre) {
     case 'robot':
-      return { freqScale: 0.92, oscType: 'square' as OscillatorType, qScale: 1.6, detuneCents: 18, noiseMix: 0.12, filterHighpass: 120, filterLowpass: 3800 };
+      return { freqScale: 0.92, oscType: 'square' as OscillatorType, qScale: 1.5, detuneCents: 16, noiseMix: 0.08, filterHighpass: 130, filterLowpass: 3600 };
     case 'radio':
-      return { freqScale: 1.08, oscType: 'sawtooth' as OscillatorType, qScale: 1.3, detuneCents: 4, noiseMix: 0.18, filterHighpass: 480, filterLowpass: 2400 };
+      return { freqScale: 1.06, oscType: 'sawtooth' as OscillatorType, qScale: 1.25, detuneCents: 4, noiseMix: 0.12, filterHighpass: 420, filterLowpass: 2500 };
     case 'deep':
-      return { freqScale: 0.65, oscType: 'sawtooth' as OscillatorType, qScale: 0.95, detuneCents: 8, noiseMix: 0.06, filterHighpass: 70, filterLowpass: 3200 };
+      return { freqScale: 0.72, oscType: 'sawtooth' as OscillatorType, qScale: 0.9, detuneCents: 6, noiseMix: 0.04, filterHighpass: 75, filterLowpass: 3400 };
     case 'whisper':
-      return { freqScale: 1.0, oscType: 'triangle' as OscillatorType, qScale: 1.1, detuneCents: 0, noiseMix: 0.85, filterHighpass: 350, filterLowpass: 4500 };
+      return { freqScale: 1.0, oscType: 'triangle' as OscillatorType, qScale: 1.05, detuneCents: 0, noiseMix: 0.75, filterHighpass: 320, filterLowpass: 4400 };
     case 'choir':
-      return { freqScale: 1.15, oscType: 'sawtooth' as OscillatorType, qScale: 1.1, detuneCents: 22, noiseMix: 0.05, filterHighpass: 100, filterLowpass: 4600 };
+      return { freqScale: 1.12, oscType: 'sawtooth' as OscillatorType, qScale: 1.05, detuneCents: 20, noiseMix: 0.04, filterHighpass: 100, filterLowpass: 4600 };
     case 'megaphone':
-      return { freqScale: 1.12, oscType: 'sawtooth' as OscillatorType, qScale: 1.85, detuneCents: 6, noiseMix: 0.16, filterHighpass: 650, filterLowpass: 2100 };
+      return { freqScale: 1.1, oscType: 'sawtooth' as OscillatorType, qScale: 1.6, detuneCents: 6, noiseMix: 0.12, filterHighpass: 580, filterLowpass: 2300 };
     case 'cyborg':
-      return { freqScale: 0.88, oscType: 'square' as OscillatorType, qScale: 1.9, detuneCents: 35, noiseMix: 0.14, filterHighpass: 180, filterLowpass: 3400 };
+      return { freqScale: 0.88, oscType: 'square' as OscillatorType, qScale: 1.7, detuneCents: 30, noiseMix: 0.1, filterHighpass: 180, filterLowpass: 3400 };
     case 'natural':
     default:
-      return { freqScale: 1.0, oscType: 'sawtooth' as OscillatorType, qScale: 1.0, detuneCents: 5, noiseMix: 0.08, filterHighpass: 90, filterLowpass: 4400 };
+      return { freqScale: 1.0, oscType: 'sawtooth' as OscillatorType, qScale: 0.88, detuneCents: 4, noiseMix: 0.04, filterHighpass: 85, filterLowpass: 4500 };
   }
 }
 
@@ -175,22 +175,23 @@ export async function renderDspSpeechBuffer(
   osc1.type = mod.oscType;
   osc1.frequency.value = baseFreq;
 
+  // Sub-warmth triangle layer gives glottal body so voices sound fuller on phone speakers
   const osc2 = offlineCtx.createOscillator();
-  osc2.type = mod.oscType;
+  osc2.type = settings.dspTimbre === 'robot' || settings.dspTimbre === 'cyborg' ? mod.oscType : 'triangle';
   osc2.frequency.value = baseFreq;
   osc2.detune.value = mod.detuneCents;
 
   // Vibrato LFO
   const lfo = offlineCtx.createOscillator();
-  lfo.frequency.value = 5.4;
+  lfo.frequency.value = 5.2;
   const lfoGain = offlineCtx.createGain();
-  lfoGain.gain.value = baseFreq * 0.045 * settings.dspVibrato;
+  lfoGain.gain.value = baseFreq * 0.038 * settings.dspVibrato;
   lfo.connect(lfoGain);
   lfoGain.connect(osc1.frequency);
   lfoGain.connect(osc2.frequency);
 
   const oscMix = offlineCtx.createGain();
-  oscMix.gain.value = settings.dspTimbre === 'whisper' ? 0.08 : 0.45;
+  oscMix.gain.value = settings.dspTimbre === 'whisper' ? 0.09 : 0.48;
   osc1.connect(oscMix);
   osc2.connect(oscMix);
 
@@ -206,25 +207,25 @@ export async function renderDspSpeechBuffer(
   // 3 parallel vocal tract formant filters
   const f1 = offlineCtx.createBiquadFilter();
   f1.type = 'bandpass';
-  f1.Q.value = 6.5 * mod.qScale;
+  f1.Q.value = 5.8 * mod.qScale;
   f1.frequency.value = 500;
 
   const f2 = offlineCtx.createBiquadFilter();
   f2.type = 'bandpass';
-  f2.Q.value = 8.5 * mod.qScale;
+  f2.Q.value = 7.6 * mod.qScale;
   f2.frequency.value = 1500;
 
   const f3 = offlineCtx.createBiquadFilter();
   f3.type = 'bandpass';
-  f3.Q.value = 10.5 * mod.qScale;
+  f3.Q.value = 9.5 * mod.qScale;
   f3.frequency.value = 2500;
 
   const f1Gain = offlineCtx.createGain();
-  f1Gain.gain.value = 1.0;
+  f1Gain.gain.value = 1.05;
   const f2Gain = offlineCtx.createGain();
-  f2Gain.gain.value = 0.65;
+  f2Gain.gain.value = 0.68;
   const f3Gain = offlineCtx.createGain();
-  f3Gain.gain.value = 0.32;
+  f3Gain.gain.value = 0.34;
 
   oscMix.connect(voiceGain);
   voiceGain.connect(f1);
@@ -235,7 +236,7 @@ export async function renderDspSpeechBuffer(
   noiseGain.connect(f3);
 
   const formantSum = offlineCtx.createGain();
-  formantSum.gain.value = 1.6;
+  formantSum.gain.value = 1.75;
   f1.connect(f1Gain);
   f2.connect(f2Gain);
   f3.connect(f3Gain);
@@ -257,7 +258,7 @@ export async function renderDspSpeechBuffer(
 
   // Master + optional Echo
   const master = offlineCtx.createGain();
-  master.gain.value = Math.min(1, Math.max(0.05, settings.volume)) * 0.85;
+  master.gain.value = Math.min(1, Math.max(0.08, settings.volume)) * 0.92;
   lp.connect(master);
 
   if (settings.dspEcho > 0.02) {
