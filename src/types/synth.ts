@@ -90,6 +90,7 @@ export interface AndroidAppConfig {
   hapticsEnabled: boolean;
   mediaSessionEnabled: boolean;
   darkMode: boolean;
+  backendUrl: string;
 }
 
 export interface DiagnosticItem {

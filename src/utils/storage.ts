@@ -47,6 +47,7 @@ export const DEFAULT_ANDROID_CONFIG: AndroidAppConfig = {
   hapticsEnabled: true,
   mediaSessionEnabled: true,
   darkMode: true,
+  backendUrl: '',
 };
 
 export const DEFAULT_PRONUNCIATION_RULES: PronunciationRule[] = [

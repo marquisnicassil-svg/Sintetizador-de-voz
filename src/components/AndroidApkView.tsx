@@ -3,6 +3,8 @@ import {
   CheckCircle2,
   Copy,
   Download,
+  Globe,
+  Loader2,
   RefreshCw,
   Smartphone,
   Terminal,
@@ -13,6 +15,8 @@ import {
   downloadTextFile,
   generateAndroidManifestXml,
   generateCapacitorConfigJson,
+  isStaticHostingEnvironment,
+  resolveApiUrl,
   runAndroidDiagnostics,
 } from '../utils/androidHelpers';
 
@@ -34,6 +38,13 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
 }) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [testingBackend, setTestingBackend] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+
+  const isStaticHost = isStaticHostingEnvironment();
 
   const refreshDiagnostics = () => {
     setDiagnostics(runAndroidDiagnostics());
@@ -50,6 +61,38 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
       window.setTimeout(() => setCopiedCmd(false), 2000);
     } catch {
       // Fallback ignored
+    }
+  };
+
+  const handleTestBackend = async () => {
+    setTestingBackend(true);
+    setBackendStatus(null);
+    try {
+      const url = resolveApiUrl('/api/health', config.backendUrl);
+      const res = await fetch(url);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        setBackendStatus({
+          ok: false,
+          message:
+            'Nenhuma API encontrada neste endereço (hospedagem estática). Voz Nativa e DSP Offline continuam 100% ativos.',
+        });
+        return;
+      }
+      const data = (await res.json()) as { ok?: boolean; service?: string };
+      setBackendStatus({
+        ok: !!data.ok,
+        message: data.ok
+          ? `Conectado com sucesso (${data.service || 'API ativa'})`
+          : 'Servidor respondeu, mas sem confirmação.',
+      });
+    } catch {
+      setBackendStatus({
+        ok: false,
+        message: 'Não foi possível conectar à URL informada. Verifique CORS ou conexão.',
+      });
+    } finally {
+      setTestingBackend(false);
     }
   };
 
@@ -123,6 +166,58 @@ export const AndroidApkView: React.FC<AndroidApkViewProps> = ({
               </button>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* GitHub Pages & Remote Backend Connection */}
+      <section className="rounded-2xl bg-white dark:bg-[#151a22] border border-stone-200 dark:border-slate-800 p-4 space-y-3">
+        <div className="flex items-start gap-2.5">
+          <Globe className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
+          <div>
+            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+              GitHub Pages e Servidor IA Remoto
+            </h2>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              {isStaticHost
+                ? 'Executando em hospedagem estática: Voz Nativa e DSP Offline estão ativos sem servidor.'
+                : 'Workflow automático incluído (.github/workflows/deploy-pages.yml) para testar no GitHub Pages.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-xs font-medium text-stone-600 dark:text-stone-400">
+            URL do Backend para Vozes IA (opcional no GitHub Pages / APK)
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              value={config.backendUrl}
+              onChange={(e) => onUpdateConfig({ backendUrl: e.target.value })}
+              placeholder="Deixe vazio no servidor local ou cole https://seu-servidor..."
+              className="flex-1 min-h-[44px] px-3 rounded-xl bg-stone-50 dark:bg-[#0e1116] border border-stone-200 dark:border-slate-800 text-xs sm:text-sm font-mono-tabular text-stone-900 dark:text-stone-100"
+            />
+            <button
+              type="button"
+              onClick={handleTestBackend}
+              disabled={testingBackend}
+              className="min-h-[44px] px-4 rounded-xl bg-stone-900 dark:bg-orange-500 hover:bg-stone-800 dark:hover:bg-orange-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              {testingBackend ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              <span>Testar Conexão</span>
+            </button>
+          </div>
+          {backendStatus && (
+            <p
+              className={`text-xs ${
+                backendStatus.ok
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {backendStatus.message}
+            </p>
+          )}
         </div>
       </section>
 

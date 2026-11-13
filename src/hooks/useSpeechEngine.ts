@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AI_VOICE_PACK } from '../data/voicePacks';
 import type { AndroidAppConfig, PronunciationRule, VoiceSettings } from '../types/synth';
-import { applyPronunciationRules, splitIntoSpeechChunks, triggerHaptic } from '../utils/androidHelpers';
+import { applyPronunciationRules, postApiJson, splitIntoSpeechChunks, triggerHaptic } from '../utils/androidHelpers';
 import { audioBufferToWavBlob, renderDspSpeechBuffer } from '../utils/dspFormantEngine';
 
 export type PlaybackStatus = 'idle' | 'rendering' | 'speaking' | 'paused';
@@ -447,10 +447,12 @@ export function useSpeechEngine({
       const secondaryPreset =
         AI_VOICE_PACK.find((v) => v.id === effSettings.secondAiVoiceId) || AI_VOICE_PACK[1];
 
-      const response = await fetch('/api/ai/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<{
+        audioBase64?: string;
+        mimeType?: string;
+      }>(
+        '/api/ai/tts',
+        {
           text: processed,
           voiceName: primaryPreset.voiceName,
           style: effSettings.aiCustomStyle.trim() || primaryPreset.style,
@@ -460,17 +462,12 @@ export function useSpeechEngine({
           secondText: effSettings.dualSpeakerMode
             ? applyPronunciationRules(effSettings.secondText, rules)
             : '',
-        }),
-      });
+        },
+        androidConfig.backendUrl
+      );
 
-      const data = (await response.json()) as {
-        audioBase64?: string;
-        mimeType?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !data.audioBase64) {
-        throw new Error(data.error || 'Erro ao gerar áudio com a Voz Neural IA.');
+      if (!data.audioBase64) {
+        throw new Error('Erro ao gerar áudio com a Voz Neural IA.');
       }
 
       const bytes = base64ToUint8Array(data.audioBase64);
@@ -478,7 +475,7 @@ export function useSpeechEngine({
       new Uint8Array(bufferCopy).set(bytes);
       return new Blob([bufferCopy], { type: data.mimeType || 'audio/wav' });
     },
-    [rules]
+    [androidConfig.backendUrl, rules]
   );
 
   const speakNeuralAi = useCallback(

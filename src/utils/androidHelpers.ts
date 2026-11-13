@@ -246,3 +246,52 @@ export function downloadTextFile(filename: string, content: string, mime = 'text
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export function isStaticHostingEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { hostname, protocol } = window.location;
+  return (
+    hostname.endsWith('github.io') ||
+    protocol === 'file:' ||
+    protocol === 'capacitor:' ||
+    protocol === 'ionic:'
+  );
+}
+
+export function resolveApiUrl(apiPath: string, backendUrl?: string): string {
+  const cleanBase = (backendUrl || '').trim().replace(/\/+$/, '');
+  const cleanPath = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
+  return cleanBase ? `${cleanBase}${cleanPath}` : cleanPath;
+}
+
+export async function postApiJson<T>(
+  apiPath: string,
+  payload: unknown,
+  backendUrl?: string
+): Promise<T> {
+  const url = resolveApiUrl(apiPath, backendUrl);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    if (isStaticHostingEnvironment() && !backendUrl?.trim()) {
+      throw new Error(
+        'Hospedagem estática detectada (GitHub Pages / APK offline). As Vozes Nativas e o Pacote DSP Offline funcionam normalmente; para Vozes IA, informe a URL do servidor backend na aba APK.'
+      );
+    }
+    throw new Error(
+      `Servidor de IA indisponível neste endereço (HTTP ${response.status}). Use o Pacote DSP Offline ou Voz Nativa.`
+    );
+  }
+
+  const data = (await response.json()) as T & { error?: string };
+  if (!response.ok) {
+    throw new Error(data.error || `Erro HTTP ${response.status} ao consultar a IA.`);
+  }
+  return data;
+}
+

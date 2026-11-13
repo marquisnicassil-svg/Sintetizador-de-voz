@@ -10,10 +10,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { AiChatMessage } from '../types/synth';
+import { postApiJson } from '../utils/androidHelpers';
 
 interface AiAssistantViewProps {
   messages: AiChatMessage[];
   currentStudioText: string;
+  backendUrl?: string;
   onAddMessages: (userMsg: AiChatMessage, modelMsg: AiChatMessage) => void;
   onClearChat: () => void;
   onApplyScriptToStudio: (script: string, speakImmediately?: boolean) => void;
@@ -50,6 +52,7 @@ const QUICK_ACTIONS = [
 export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
   messages,
   currentStudioText,
+  backendUrl,
   onAddMessages,
   onClearChat,
   onApplyScriptToStudio,
@@ -80,28 +83,21 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
     };
 
     try {
-      const response = await fetch('/api/ai/assist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<{
+        reply?: string;
+        suggestedScript?: string;
+        pronunciationSuggestions?: { from: string; to: string }[];
+      }>(
+        '/api/ai/assist',
+        {
           message: clean,
           currentText: currentStudioText,
           mode,
           targetLang,
           history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
-        }),
-      });
-
-      const data = (await response.json()) as {
-        reply?: string;
-        suggestedScript?: string;
-        pronunciationSuggestions?: { from: string; to: string }[];
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Não foi possível consultar a IA agora.');
-      }
+        },
+        backendUrl
+      );
 
       const modelMsg: AiChatMessage = {
         id: `m_${Date.now() + 1}`,

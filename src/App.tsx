@@ -26,7 +26,7 @@ import type {
   SavedPhrase,
   VoiceSettings,
 } from './types/synth';
-import { triggerHaptic } from './utils/androidHelpers';
+import { postApiJson, triggerHaptic } from './utils/androidHelpers';
 import { DEFAULT_AI_CHAT, DEFAULT_VOICE_SETTINGS, storage } from './utils/storage';
 
 const NAV_ITEMS: { id: AppTab; label: string; icon: typeof AudioWaveform }[] = [
@@ -230,24 +230,23 @@ export default function App() {
     setAiOptimizing(true);
     triggerHaptic(10, androidConfig.hapticsEnabled);
     try {
-      const response = await fetch('/api/ai/assist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<{
+        suggestedScript?: string;
+        reply?: string;
+      }>(
+        '/api/ai/assist',
+        {
           message: 'Otimize este texto para locução natural em português com pausas equilibradas.',
           currentText: text,
           mode: 'optimize',
-        }),
-      });
-      const data = (await response.json()) as {
-        suggestedScript?: string;
-        reply?: string;
-      };
-      if (response.ok && data.suggestedScript) {
+        },
+        androidConfig.backendUrl
+      );
+      if (data.suggestedScript) {
         handleTextChange(data.suggestedScript);
       }
     } catch {
-      // If offline, switch to AI tab or fail silently without breaking Studio
+      // Static host without remote backend URL configured
     } finally {
       setAiOptimizing(false);
     }
@@ -353,6 +352,7 @@ export default function App() {
               <AiAssistantView
                 messages={aiMessages}
                 currentStudioText={text}
+                backendUrl={androidConfig.backendUrl}
                 onAddMessages={handleAddAiMessages}
                 onClearChat={handleClearAiChat}
                 onApplyScriptToStudio={handleApplyScriptFromAi}
@@ -386,6 +386,7 @@ export default function App() {
               <AiAssistantView
                 messages={aiMessages}
                 currentStudioText={text}
+                backendUrl={androidConfig.backendUrl}
                 onAddMessages={handleAddAiMessages}
                 onClearChat={handleClearAiChat}
                 onApplyScriptToStudio={handleApplyScriptFromAi}
