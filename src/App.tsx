@@ -149,6 +149,15 @@ export default function App() {
     mainRef.current?.scrollTo({ top: 0 });
   };
 
+  const handleResetVoiceSettings = useCallback(() => {
+    stop();
+    updateSettings({
+      ...DEFAULT_VOICE_SETTINGS,
+      engineMode: 'native-tts',
+      selectedVoiceURI: settings.selectedVoiceURI,
+    });
+  }, [settings.selectedVoiceURI, stop, updateSettings]);
+
   const handleAddRule = (from: string, to: string) => {
     const next = [...rules, { id: `r_${Date.now()}`, from, to, enabled: true }];
     setRules(next);
@@ -348,6 +357,7 @@ export default function App() {
                 onSaveAsPhrase={handleSaveFromStudio}
                 onQuickAiOptimize={handleQuickAiOptimize}
                 aiOptimizing={aiOptimizing}
+                onResetSettings={handleResetVoiceSettings}
               />
             )}
 
@@ -362,12 +372,7 @@ export default function App() {
                 onClearError={clearError}
                 onStop={stop}
                 onUpdateSettings={updateSettings}
-                onResetSettings={() =>
-                  updateSettings({
-                    ...DEFAULT_VOICE_SETTINGS,
-                    selectedVoiceURI: settings.selectedVoiceURI,
-                  })
-                }
+                onResetSettings={handleResetVoiceSettings}
                 onTestVoice={(sample, overridePatch) => speak(sample, overridePatch)}
                 rules={rules}
                 onAddRule={handleAddRule}
@@ -432,12 +437,7 @@ export default function App() {
                 onClearError={clearError}
                 onStop={stop}
                 onUpdateSettings={updateSettings}
-                onResetSettings={() =>
-                  updateSettings({
-                    ...DEFAULT_VOICE_SETTINGS,
-                    selectedVoiceURI: settings.selectedVoiceURI,
-                  })
-                }
+                onResetSettings={handleResetVoiceSettings}
                 onTestVoice={(sample, overridePatch) => speak(sample, overridePatch)}
                 rules={rules}
                 onAddRule={handleAddRule}

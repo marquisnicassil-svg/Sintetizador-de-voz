@@ -349,22 +349,22 @@ function createGlottalPeriodicWave(ctx: BaseAudioContext): PeriodicWave {
 function timbreModifiers(timbre: DspTimbre) {
   switch (timbre) {
     case 'robot':
-      return { freqScale: 0.94, useRawOsc: true, oscType: 'square' as OscillatorType, qScale: 1.15, detuneCents: 10, breathMix: 0.02, filterHighpass: 130, filterLowpass: 3100 };
+      return { freqScale: 0.94, useRawOsc: true, oscType: 'square' as OscillatorType, qScale: 1.05, detuneCents: 6, breathMix: 0.01, filterHighpass: 130, filterLowpass: 2900 };
     case 'radio':
-      return { freqScale: 1.04, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.95, detuneCents: 2, breathMix: 0.05, filterHighpass: 360, filterLowpass: 2600 };
+      return { freqScale: 1.04, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.85, detuneCents: 0, breathMix: 0.02, filterHighpass: 340, filterLowpass: 2500 };
     case 'deep':
-      return { freqScale: 0.78, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.85, detuneCents: 3, breathMix: 0.045, filterHighpass: 75, filterLowpass: 3000 };
+      return { freqScale: 0.8, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.78, detuneCents: 0, breathMix: 0.018, filterHighpass: 75, filterLowpass: 2700 };
     case 'whisper':
-      return { freqScale: 1.0, useRawOsc: false, oscType: 'triangle' as OscillatorType, qScale: 0.95, detuneCents: 0, breathMix: 0.58, filterHighpass: 280, filterLowpass: 3800 };
+      return { freqScale: 1.0, useRawOsc: false, oscType: 'triangle' as OscillatorType, qScale: 0.85, detuneCents: 0, breathMix: 0.45, filterHighpass: 260, filterLowpass: 3500 };
     case 'choir':
-      return { freqScale: 1.08, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.9, detuneCents: 12, breathMix: 0.05, filterHighpass: 95, filterLowpass: 3600 };
+      return { freqScale: 1.06, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.82, detuneCents: 7, breathMix: 0.02, filterHighpass: 95, filterLowpass: 3200 };
     case 'megaphone':
-      return { freqScale: 1.06, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 1.15, detuneCents: 3, breathMix: 0.04, filterHighpass: 480, filterLowpass: 2350 };
+      return { freqScale: 1.06, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 1.0, detuneCents: 0, breathMix: 0.02, filterHighpass: 440, filterLowpass: 2300 };
     case 'cyborg':
-      return { freqScale: 0.9, useRawOsc: true, oscType: 'square' as OscillatorType, qScale: 1.2, detuneCents: 18, breathMix: 0.03, filterHighpass: 160, filterLowpass: 2950 };
+      return { freqScale: 0.92, useRawOsc: true, oscType: 'square' as OscillatorType, qScale: 1.1, detuneCents: 10, breathMix: 0.015, filterHighpass: 150, filterLowpass: 2800 };
     case 'natural':
     default:
-      return { freqScale: 1.0, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.8, detuneCents: 2.5, breathMix: 0.055, filterHighpass: 85, filterLowpass: 3400 };
+      return { freqScale: 1.0, useRawOsc: false, oscType: 'sawtooth' as OscillatorType, qScale: 0.74, detuneCents: 0, breathMix: 0.018, filterHighpass: 85, filterLowpass: 2900 };
   }
 }
 
@@ -407,7 +407,8 @@ export async function renderDspSpeechBuffer(
   } else {
     const glottalWave = createGlottalPeriodicWave(offlineCtx);
     osc1.setPeriodicWave(glottalWave);
-    osc2.type = 'triangle';
+    // Pure fundamental chest sine at detune = 0 removes robotic vocoder phasing
+    osc2.type = 'sine';
   }
   osc1.frequency.value = baseFreq;
   osc2.frequency.value = baseFreq;
@@ -417,15 +418,15 @@ export async function renderDspSpeechBuffer(
   const lfo = offlineCtx.createOscillator();
   lfo.frequency.value = 4.6;
   const lfoGain = offlineCtx.createGain();
-  lfoGain.gain.value = baseFreq * 0.016 * settings.dspVibrato;
+  lfoGain.gain.value = baseFreq * 0.014 * settings.dspVibrato;
   lfo.connect(lfoGain);
   lfoGain.connect(osc1.frequency);
   lfoGain.connect(osc2.frequency);
 
   const osc1Gain = offlineCtx.createGain();
-  osc1Gain.gain.value = settings.dspTimbre === 'whisper' ? 0.08 : 0.72;
+  osc1Gain.gain.value = settings.dspTimbre === 'whisper' ? 0.08 : 0.68;
   const osc2Gain = offlineCtx.createGain();
-  osc2Gain.gain.value = settings.dspTimbre === 'whisper' ? 0.04 : 0.22;
+  osc2Gain.gain.value = settings.dspTimbre === 'whisper' ? 0.04 : 0.32;
 
   const oscMix = offlineCtx.createGain();
   oscMix.gain.value = 1.0;
@@ -434,12 +435,16 @@ export async function renderDspSpeechBuffer(
   osc1Gain.connect(oscMix);
   osc2Gain.connect(oscMix);
 
-  // Aspiration breath source routed through formants removes sterile electronic feel
+  // Gentle aspiration breath source
   const breathSource = offlineCtx.createBufferSource();
   breathSource.buffer = noiseBuffer;
+  const breathLp = offlineCtx.createBiquadFilter();
+  breathLp.type = 'lowpass';
+  breathLp.frequency.value = 1600;
   const breathGain = offlineCtx.createGain();
   breathGain.gain.value = mod.breathMix;
-  breathSource.connect(breathGain);
+  breathSource.connect(breathLp);
+  breathLp.connect(breathGain);
 
   // Fricative consonant noise band
   const fricSource = offlineCtx.createBufferSource();
@@ -456,43 +461,53 @@ export async function renderDspSpeechBuffer(
   const voiceGain = offlineCtx.createGain();
   voiceGain.gain.value = 0;
 
-  // Wider natural human vocal tract bandwidths (eliminates hollow metallic ringing)
+  // Wider natural human vocal tract bandwidths
   const f1 = offlineCtx.createBiquadFilter();
   f1.type = 'bandpass';
-  f1.Q.value = 3.4 * mod.qScale;
+  f1.Q.value = 2.8 * mod.qScale;
   f1.frequency.value = 500;
 
   const f2 = offlineCtx.createBiquadFilter();
   f2.type = 'bandpass';
-  f2.Q.value = 4.5 * mod.qScale;
+  f2.Q.value = 3.6 * mod.qScale;
   f2.frequency.value = 1500;
 
   const f3 = offlineCtx.createBiquadFilter();
   f3.type = 'bandpass';
-  f3.Q.value = 5.6 * mod.qScale;
+  f3.Q.value = 4.5 * mod.qScale;
   f3.frequency.value = 2500;
+
+  // Direct chest fundamental warmth filter so voice has natural body
+  const chestLp = offlineCtx.createBiquadFilter();
+  chestLp.type = 'lowpass';
+  chestLp.frequency.value = 240;
+  const chestGain = offlineCtx.createGain();
+  chestGain.gain.value = mod.useRawOsc ? 0.05 : 0.34;
 
   const f1Gain = offlineCtx.createGain();
   f1Gain.gain.value = 1.15;
   const f2Gain = offlineCtx.createGain();
-  f2Gain.gain.value = 0.68;
+  f2Gain.gain.value = 0.64;
   const f3Gain = offlineCtx.createGain();
-  f3Gain.gain.value = 0.24;
+  f3Gain.gain.value = 0.2;
 
   oscMix.connect(voiceGain);
   breathGain.connect(voiceGain);
   voiceGain.connect(f1);
   voiceGain.connect(f2);
   voiceGain.connect(f3);
+  voiceGain.connect(chestLp);
+  chestLp.connect(chestGain);
 
   const formantSum = offlineCtx.createGain();
-  formantSum.gain.value = 1.85;
+  formantSum.gain.value = 1.75;
   f1.connect(f1Gain);
   f2.connect(f2Gain);
   f3.connect(f3Gain);
   f1Gain.connect(formantSum);
   f2Gain.connect(formantSum);
   f3Gain.connect(formantSum);
+  chestGain.connect(formantSum);
 
   noiseGain.connect(formantSum);
 
@@ -555,8 +570,8 @@ export async function renderDspSpeechBuffer(
     noiseBand.frequency.setTargetAtTime(item.noiseFreq, t, 0.01);
 
     const f0 = Math.max(65, Math.min(440, baseFreq * item.pitchMul * prosodyContour));
-    osc1.frequency.setTargetAtTime(f0, t, 0.018);
-    osc2.frequency.setTargetAtTime(f0, t, 0.018);
+    osc1.frequency.setTargetAtTime(f0, t, 0.048);
+    osc2.frequency.setTargetAtTime(f0, t, 0.048);
 
     if (item.voiced && item.voiceLevel > 0) {
       voiceGain.gain.setTargetAtTime(item.voiceLevel, t, 0.008);

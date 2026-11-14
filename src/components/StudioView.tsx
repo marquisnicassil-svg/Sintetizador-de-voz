@@ -5,6 +5,7 @@ import {
   Loader2,
   Pause,
   Play,
+  RotateCcw,
   Share2,
   Sparkles,
   Square,
@@ -38,6 +39,7 @@ interface StudioViewProps {
   onSaveAsPhrase: (text: string) => void;
   onQuickAiOptimize: () => Promise<void>;
   aiOptimizing: boolean;
+  onResetSettings: () => void;
 }
 
 export const StudioView: React.FC<StudioViewProps> = ({
@@ -60,8 +62,16 @@ export const StudioView: React.FC<StudioViewProps> = ({
   onSaveAsPhrase,
   onQuickAiOptimize,
   aiOptimizing,
+  onResetSettings,
 }) => {
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState(false);
+
+  const handleReset = () => {
+    onResetSettings();
+    setResetFeedback(true);
+    window.setTimeout(() => setResetFeedback(false), 1800);
+  };
 
   const insertPauseTag = (ms: number) => {
     const addition = `${text.endsWith(' ') || text.length === 0 ? '' : ' '}[pausa ${ms}ms] `;
@@ -134,13 +144,24 @@ export const StudioView: React.FC<StudioViewProps> = ({
             {settings.engineMode === 'ai-neural' &&
               `IA Neural: ${currentAiVoice.name} · ${currentAiVoice.role}`}
           </span>
-          <span className="font-mono-tabular shrink-0">
-            {settings.engineMode === 'ai-neural'
-              ? settings.dualSpeakerMode
-                ? '2 Vozes'
-                : 'WAV 24kHz'
-              : `${settings.rate.toFixed(2)}x · Tom ${settings.pitch.toFixed(2)}`}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-mono-tabular">
+              {settings.engineMode === 'ai-neural'
+                ? settings.dualSpeakerMode
+                  ? '2 Vozes'
+                  : 'WAV 24kHz'
+                : `${settings.rate.toFixed(2)}x · Tom ${settings.pitch.toFixed(2)}`}
+            </span>
+            <button
+              type="button"
+              onClick={handleReset}
+              aria-label="Voltar à configuração padrão de voz"
+              className="min-h-[34px] px-2.5 rounded-lg bg-stone-100 dark:bg-[#0e1116] hover:bg-stone-200 dark:hover:bg-slate-800 text-stone-700 dark:text-stone-200 font-semibold flex items-center gap-1 whitespace-nowrap cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3 text-orange-500 shrink-0" />
+              <span>{resetFeedback ? 'Restaurado!' : 'Voz Padrão'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Voice Pack Strip for DSP Offline */}
@@ -271,7 +292,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           rows={settings.engineMode === 'ai-neural' && settings.dualSpeakerMode ? 3 : 5}
-          placeholder="Digite ou cole o texto aqui para sintetizar no celular..."
+          placeholder="Cole qualquer texto aqui (falas, jogos, HP 100/200, códigos de cor §a, nicks estilizados, números e símbolos)..."
           className="w-full rounded-xl bg-stone-50 dark:bg-[#0e1116] border border-stone-200 dark:border-slate-800 p-3.5 text-base leading-relaxed text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/70 resize-y"
         />
 

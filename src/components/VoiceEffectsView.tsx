@@ -52,9 +52,16 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
     hasRemoteBackend ? 'ai' : 'dsp'
   );
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState(false);
   const [search, setSearch] = useState('');
   const [fromWord, setFromWord] = useState('');
   const [toWord, setToWord] = useState('');
+
+  const handleReset = () => {
+    onResetSettings();
+    setResetDone(true);
+    window.setTimeout(() => setResetDone(false), 1800);
+  };
 
   const filteredVoices = useMemo(() => {
     return voices.filter((v) => {
@@ -159,15 +166,25 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
         </div>
       )}
 
-      {/* Multi-Voice Pack Browser */}
+      {/* Multi-Voice Pack */}
       <section className="rounded-2xl bg-white dark:bg-[#151a22] border border-stone-200 dark:border-slate-800 p-4 space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
-            Pacote com Várias Vozes
-          </h2>
-          <p className="text-xs text-stone-500 dark:text-stone-400">
-            22 vozes selecionadas entre IA Neural, DSP Offline e motor nativo do Android
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+              Pacote com Várias Vozes
+            </h2>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              22 vozes selecionadas entre IA Neural, DSP Offline e motor nativo do Android
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="min-h-[40px] px-3 rounded-xl bg-stone-100 dark:bg-[#0e1116] hover:bg-stone-200 dark:hover:bg-slate-800 text-xs font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+            <span>{resetDone ? 'Restaurado!' : 'Voltar ao Padrão'}</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-stone-100 dark:bg-[#0e1116]">
@@ -462,11 +479,11 @@ export const VoiceEffectsView: React.FC<VoiceEffectsViewProps> = ({
           </div>
           <button
             type="button"
-            onClick={onResetSettings}
+            onClick={handleReset}
             className="min-h-[44px] px-3 rounded-xl bg-stone-100 dark:bg-[#0e1116] hover:bg-stone-200 dark:hover:bg-slate-800 text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Padrão</span>
+            <RotateCcw className="w-3.5 h-3.5 text-orange-500" />
+            <span>{resetDone ? 'Restaurado!' : 'Voltar ao Padrão'}</span>
           </button>
         </div>
 

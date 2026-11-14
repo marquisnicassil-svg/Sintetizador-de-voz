@@ -22,16 +22,16 @@ const AI_LOCAL_PROFILES: Record<
   string,
   Pick<VoiceSettings, 'dspTimbre' | 'dspBaseFreq' | 'pitch' | 'rate' | 'dspVibrato' | 'dspEcho'>
 > = {
-  'clara-jornal': { dspTimbre: 'natural', dspBaseFreq: 192, pitch: 1.06, rate: 1.04, dspVibrato: 0.08, dspEcho: 0.0 },
-  'lucas-dinamico': { dspTimbre: 'natural', dspBaseFreq: 132, pitch: 1.02, rate: 1.1, dspVibrato: 0.06, dspEcho: 0.0 },
-  'bruno-doc': { dspTimbre: 'deep', dspBaseFreq: 96, pitch: 0.9, rate: 0.95, dspVibrato: 0.06, dspEcho: 0.04 },
-  'rafael-epico': { dspTimbre: 'deep', dspBaseFreq: 102, pitch: 0.92, rate: 0.98, dspVibrato: 0.07, dspEcho: 0.06 },
-  'sofia-suave': { dspTimbre: 'natural', dspBaseFreq: 204, pitch: 1.08, rate: 1.0, dspVibrato: 0.1, dspEcho: 0.0 },
-  'helena-livro': { dspTimbre: 'natural', dspBaseFreq: 184, pitch: 1.04, rate: 0.96, dspVibrato: 0.1, dspEcho: 0.03 },
-  'mateus-podcast': { dspTimbre: 'natural', dspBaseFreq: 124, pitch: 0.99, rate: 1.06, dspVibrato: 0.06, dspEcho: 0.0 },
-  'beatriz-ura': { dspTimbre: 'natural', dspBaseFreq: 196, pitch: 1.06, rate: 1.02, dspVibrato: 0.05, dspEcho: 0.0 },
-  'diogo-radio': { dspTimbre: 'radio', dspBaseFreq: 140, pitch: 1.03, rate: 1.12, dspVibrato: 0.06, dspEcho: 0.02 },
-  'valentina-asmr': { dspTimbre: 'whisper', dspBaseFreq: 172, pitch: 1.03, rate: 0.9, dspVibrato: 0.05, dspEcho: 0.08 },
+  'clara-jornal': { dspTimbre: 'natural', dspBaseFreq: 190, pitch: 1.05, rate: 1.04, dspVibrato: 0.0, dspEcho: 0.0 },
+  'lucas-dinamico': { dspTimbre: 'natural', dspBaseFreq: 132, pitch: 1.0, rate: 1.08, dspVibrato: 0.0, dspEcho: 0.0 },
+  'bruno-doc': { dspTimbre: 'deep', dspBaseFreq: 98, pitch: 0.92, rate: 0.96, dspVibrato: 0.0, dspEcho: 0.0 },
+  'rafael-epico': { dspTimbre: 'deep', dspBaseFreq: 104, pitch: 0.94, rate: 0.98, dspVibrato: 0.0, dspEcho: 0.0 },
+  'sofia-suave': { dspTimbre: 'natural', dspBaseFreq: 200, pitch: 1.06, rate: 1.0, dspVibrato: 0.0, dspEcho: 0.0 },
+  'helena-livro': { dspTimbre: 'natural', dspBaseFreq: 184, pitch: 1.03, rate: 0.97, dspVibrato: 0.0, dspEcho: 0.0 },
+  'mateus-podcast': { dspTimbre: 'natural', dspBaseFreq: 126, pitch: 0.98, rate: 1.05, dspVibrato: 0.0, dspEcho: 0.0 },
+  'beatriz-ura': { dspTimbre: 'natural', dspBaseFreq: 194, pitch: 1.05, rate: 1.02, dspVibrato: 0.0, dspEcho: 0.0 },
+  'diogo-radio': { dspTimbre: 'radio', dspBaseFreq: 138, pitch: 1.02, rate: 1.1, dspVibrato: 0.0, dspEcho: 0.0 },
+  'valentina-asmr': { dspTimbre: 'whisper', dspBaseFreq: 170, pitch: 1.02, rate: 0.92, dspVibrato: 0.0, dspEcho: 0.0 },
 };
 
 function mapAiVoiceToLocalSettings(aiVoiceId: string, base: VoiceSettings): VoiceSettings {
@@ -486,7 +486,7 @@ export function useSpeechEngine({
         }
       }
 
-      // 3) Android System Speech API
+      // 3) Android System Speech API (try even if getVoices() hasn't populated yet)
       const hasSpeechApi = typeof window !== 'undefined' && 'speechSynthesis' in window;
       const currentVoices = hasSpeechApi
         ? voices.length > 0
@@ -494,7 +494,7 @@ export function useSpeechEngine({
           : window.speechSynthesis.getVoices()
         : [];
 
-      if (!hasSpeechApi || currentVoices.length === 0) {
+      if (!hasSpeechApi) {
         await speakDspFormant(
           rawText,
           effSettings,
@@ -661,9 +661,7 @@ export function useSpeechEngine({
       const hasNativeEngine =
         !!getAndroidNativeTtsBridge() ||
         !!getCapacitorTtsPlugin() ||
-        (typeof window !== 'undefined' &&
-          'speechSynthesis' in window &&
-          (voices.length > 0 || window.speechSynthesis.getVoices().length > 0));
+        (typeof window !== 'undefined' && 'speechSynthesis' in window);
 
       if (hasNativeEngine) {
         await speakNativeTts(
@@ -679,7 +677,7 @@ export function useSpeechEngine({
         );
       }
     },
-    [speakDspFormant, speakNativeTts, voices.length]
+    [speakDspFormant, speakNativeTts]
   );
 
   const speakNeuralAi = useCallback(

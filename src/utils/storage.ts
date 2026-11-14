@@ -19,18 +19,11 @@ const KEYS = {
 
 function detectInitialEngineMode(): VoiceSettings['engineMode'] {
   if (typeof window === 'undefined') return 'native-tts';
-  const { hostname, protocol } = window.location;
-  const isStaticOrApk =
-    hostname.endsWith('github.io') ||
-    protocol === 'file:' ||
-    protocol === 'capacitor:' ||
-    protocol === 'ionic:';
-  if (isStaticOrApk) {
-    const hasVoices =
-      'speechSynthesis' in window && window.speechSynthesis.getVoices().length > 0;
-    return hasVoices ? 'native-tts' : 'dsp-formant';
-  }
-  return 'native-tts';
+  const hasNative =
+    'speechSynthesis' in window ||
+    !!(window as unknown as { AndroidTTS?: unknown }).AndroidTTS ||
+    !!(window as unknown as { Capacitor?: { Plugins?: { TextToSpeech?: unknown } } }).Capacitor?.Plugins?.TextToSpeech;
+  return hasNative ? 'native-tts' : 'dsp-formant';
 }
 
 function detectInitialStatusBarOffset(): number {
@@ -79,7 +72,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   dspTimbre: 'natural',
   dspVoiceId: 'dsp-natural',
   dspBaseFreq: 132,
-  dspVibrato: 0.08,
+  dspVibrato: 0.0,
   dspEcho: 0.0,
   aiVoiceId: 'clara-jornal',
   aiCustomStyle: '',

@@ -1,4 +1,5 @@
 import type { AndroidAppConfig, DiagnosticItem, PronunciationRule } from '../types/synth';
+import { normalizeAnyTextForSpeech } from './textNormalizer';
 
 export function triggerHaptic(pattern: number | number[] = 12, enabled = true): void {
   if (!enabled || typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
@@ -17,7 +18,7 @@ export function applyPronunciationRules(text: string, rules: PronunciationRule[]
     const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
     result = result.replace(regex, rule.to);
   }
-  return result;
+  return normalizeAnyTextForSpeech(result);
 }
 
 export interface SpeechChunk {
